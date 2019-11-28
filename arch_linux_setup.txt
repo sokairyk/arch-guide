@@ -1,0 +1,1711 @@
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ .--.            .-.     .-.    _                      .--.       .-.
+: .; :           : :     : :   :_;                    : .--'     .' `.
+:    :.--.  .--. : `-.   : :   .-.,-.,-..-..-..-.,-.  `. `.  .--.`. .'.-..-..---.
+: :: :: ..''  ..': .. :  : :__ : :: ,. :: :; :`.  .'   _`, :' '_.': : : :; :: .; `
+:_;:_;:_;  `.__.':_;:_;  :___.':_;:_;:_;`.__.':_,._;  `.__.'`.__.':_; `.__.': ._.'
+                                                                            : :
+                                                                            :_;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+IMPORTANT: Throughout this guide there are specific parts for installing the propriety
+           Catalyst driver for ATI GPU systems. Only follow these steps if you
+           specifically require the Catalyst drivers on your system.
+
+_____________________________________________________________________________________
+        __  ___                    __        __   ___     __       __  ___  ___
+| |\ | /__`  |   /\  |    |       |__)  /\  /__` |__     /__` \ / /__`  |  |__   |\/|
+| | \| .__/  |  /~~\ |___ |___    |__) /~~\ .__/ |___    .__/  |  .__/  |  |___  |  |
+_____________________________________________________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Internet connectivity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For wireless interfaces:
+
+	wifi-menu -o [interface]
+	
+Ethernet interfaces should work with DHCP by default. Test connectivity with: 
+
+	ping -c 3 www.google.com
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+System clock
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Update the system clock:
+
+	timedatectl set-ntp true
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Partitioning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+Check partitions on all disk devices:
+
+	lsblk
+	
+Choose a hard drive and create partitions on it:
+
+	cfdisk /dev/[disk_device]
+
+NOTE: To install Arch (non-UEFI) on a GPT instead of a MBR partitioned disk you must 
+      create a 2MB partition in the first 2TB addresses with the type: BIOS boot
+      This is required in order to install GRUB to that partition otherwise its
+      setup will fail and the system will not boot the OS after the installation.
+      For UEFI setup you should create a 500MB EFI partition, unless you have a
+      dual boot system with Windows 7, 8 or 10 UEFI installation and an EFI
+      partition is already created.
+
+Afterwards format the partitions accordingly:
+
+- ext4:
+	mkfs.ext4 /dev/[partition]
+
+- swap:
+	mkswap /dev/[partition]
+				
+Mount the partitions:
+
+- root:
+	mount /dev/[partition] /mnt
+
+- Optional data partitions (e.g. /home)
+
+	mkdir -p /mnt/[folder_name]
+	mount /dev/[partition] /mnt/[folder_name]
+
+- Enable swap
+
+	swapon /dev/[partition]
+	
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install base system
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install the base packages:
+
+	pacstrap -i /mnt base base-devel
+
+IMPORTANT: To install the grub bootloader in a UEFI system setup you should mount the
+           according EFI partition in /mnt/boot. If you have Windows already installed
+           with UEFI you can detect the proper partition with:
+
+				fdisk -l /dev/[windows_disk]
+
+           and mount it:
+
+				mount /dev/[windows_disk]/[efi_partition] /mnt/boot
+
+           this step should be done before generating the fstab file othewise you must
+           add the /boot mount entry manually.
+
+Generate fstab file:
+
+	genfstab -U -p /mnt > /mnt/etc/fstab
+
+If using an SSD with TRIM support, consider using defaults,discard in the swap line
+in fstab:
+
+	nano /mnt/etc/fstab
+
+and modify the swap entry to something like this:
+
+	# /dev/[disk]
+	UUID=[UUID]		none	swap	defaults,discard	0	0
+
+Switch to the newly installed system as root:
+
+	arch-chroot /mnt /bin/bash
+	
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Base system configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+---------------
+| Linux Image |
+---------------
+
+If the base pacstrap commmand did not install the linux image package you can install
+it with:
+
+	pacman -S linux
+
+----------
+| Editor |
+----------
+
+If the following returns command not found:
+
+	nano --version
+
+Install nano:
+
+	pacman -S nano
+
+----------------
+| Localization |
+----------------
+
+Edit the following file:
+
+	nano /etc/locale.gen
+
+Uncomment 'en_US.UTF-8' for english (US) and any other language you wish, preferably
+in UTF-8 encoding. Then generate the localization files:
+
+	locale-gen
+
+Set the default system language to English (US) or any other localization generated
+previously:
+
+	echo LANG=en_US.UTF-8 > /etc/locale.conf
+
+--------
+| Time |
+--------
+
+Select a time zone:
+
+	tzselect
+
+Set the time standard to UTC:
+
+	hwclock --systohc --utc
+
+NOTE: This will affect the clock in Windows installations and revert the time to UTC.
+      In order to fix this issue open 'regedit' and create a 'DWORD' named 'RealTimeIsUniversal'
+      in the following path:
+
+      HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation\
+
+      set the key value to '1' and restart the system.
+
+------------
+| Hostname |
+------------
+
+Set hostname:
+
+	echo [hostname] > /etc/hostname
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Boot loader
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+Install grub boot loader:
+	pacman -S grub os-prober [efibootmgr] [intel-ucode]
+
+NOTES: 'efibootmgr' is used for UEFI boot setup
+       'os-prober' is used for other OS detection
+       'intel-ucode' is for Intel CPU systems to enable micro-code updates
+
+---------------
+| Legacy BIOS |
+----------------------------------------------------------------------------------
+Install grub to the desired hard drive for Legacy BIOS:
+
+	grub-install --recheck /dev/[disk_device]
+
+--------
+| UEFI |
+----------------------------------------------------------------------------------
+
+NOTE: The EFI partition should be mounted in /boot directory as instructed in the previous
+      steps.
+
+Install grub to the desired hard drive for UEFI:
+
+	grub-install --target=x86_64-efi --efi-directory=/boot --recheck
+
+To set grub to remember the last choise on boot edit the following configuration:
+
+	nano /etc/default/grub
+
+and uncomment (or create if not present) the following values to:
+
+	GRUB_DEFAULT="saved"
+	GRUB_SAVEDEFAULT="true"
+
+---------------------------------
+| ATI GPU with Catalyst Drivers |
+----------------------------------------------------------------------------------
+
+NOTE: If the host system has an ATI GPU that will use the catalyst driver it is
+      required to disable Kernel Mode Setting that handles screen resolution.
+      In order to do so the parameter 'nomodset' must be passed to the Linux Kernel
+      through grub configuration:
+
+      GRUB_CMDLINE_LINUX_DEFAULT="param1 param2 param3 nomodeset"
+
+WARNING: If the host system has a low end Intel GPU the parameter 'i915.modeset=0'
+         must be also passed
+
+----------------------------------------------------------------------------------
+
+Then generate the grub configuration:
+
+	grub-mkconfig -o /boot/grub/grub.cfg
+
+WARNING: If the host system has other operating systems installed it's important
+         to mount the according partitions for the above command to detect them
+         and add them to the available boot options
+	
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+System users
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Set root password:
+
+	passwd
+	
+Create a user and add him to the 'users' group and 'wheel' group:
+
+	useradd -m -g users -G wheel -s /bin/bash [username]
+
+and set a password:
+
+	passwd [username]
+
+Edit the following file and uncomment the wheel group root access:
+
+	nano /etc/sudoers
+	
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Network packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install basic network tools:
+
+	pacman -S netctl dhcpcd net-tools
+
+and optionally for wireless interfaces:
+
+	pacman -S iw wpa_supplicant dialog wireless_tools
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Boot into installed system
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+Exit the shell of the installed system:
+
+	exit
+
+Unmount the partition used for installation (and any other data partitions)
+
+	umount -R /mnt
+
+Restart the system:
+
+	reboot
+
+________________________________________________________________________________________________	
+ __   __        ___    __        __   ___     __        __   ___     __       __  ___  ___
+/  ` /  \ |\ | |__  | / _` |  | |__) |__     |__)  /\  /__` |__     /__` \ / /__`  |  |__   |\/|
+\__, \__/ | \| |    | \__> \__/ |  \ |___    |__) /~~\ .__/ |___    .__/  |  .__/  |  |___  |  |
+________________________________________________________________________________________________
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Configure networking
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default there won't be any connectivity available. The package 'NetworkManger'
+is installed by default with Gnome and KDE desktop environments and provides both
+wired and wireless connectivity through system integrated UI. Until this package
+is installed, enable networking by choosing one of the following solutions:
+
+
+-----------------------
+| Wireless interfaces |
+-----------------------
+
+Start the interface with netctl:
+
+	sudo systemctl start netctl-auto@[interface]
+
+Choose a wireless network
+	sudo wifi-menu -o [interface]
+
+-----------------------
+| Ethernet interfaces |
+-----------------------
+
+Copy the example DHCP configuration profile to the netctl profiles folder
+
+	sudo cp /etc/netctl/examples/ethernet-dhcp /etc/netctl/[profile]
+
+Edit the copied profile and set the appropriate interface name
+
+	sudo nano /etc/netctl/[profile]
+
+Start the interface:
+
+	sudo netctl start [profile]
+
+NOTE: Ensure that the interface is down. If not run:
+
+	ip link set [interface] down
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Package manager & AUR
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add 32-bit libraries in the official repositories. Edit the 'pacman' configuration
+file:
+
+	sudo nano /etc/pacman.conf
+
+uncomment the multilib and refresh the repositories and update the system:
+
+	sudo pacman -Syu
+
+---------------------------------
+| ATI GPU with Catalyst Drivers |
+----------------------------------------------------------------------------------
+
+NOTE: ATI GPU users should use the catalyst driver which needs some special handling.
+      It cannot be used with the xorg packages of the official repositories and
+      the following unofficial ones should be used.
+
+Edit the 'pacman' configuration file again:
+
+	sudo nano /etc/pacman.conf
+
+and add at the top of all the other repositories the following:
+
+	[xorg117]
+	Server = http://mirror.hactar.xyz/Vi0L0/xorg117/$arch
+
+then save and close. If the repositories are not at the top of the official ones
+the contained packages will not take precidence over the official ones.
+
+Then a key needs to be added for both repositories:
+
+	sudo pacman-key -r 653C3094
+
+Verify the key:
+
+	sudo pacman-key -f 653C3094
+
+It should specify the owner Vi0L0 <vi0l093@gmail.com> who maintains the above
+unofficial repositories. Finally locally sign the imported key:
+
+	pacman-key --lsign-key 653C3094
+
+NOTE: If the above command returns an error message indicating that the key
+      couldn't be localy signed you should refresh the pacman keys and retry
+      all the above pacman-key commands:
+
+      	Clear the pacman keys directory:
+
+    		sudo rm -fr /etc/pacman.d/gnupg
+
+    	Re-init the pacman keys:
+
+			sudo pacman-key --init
+
+		Re-insert the keys for the default repositories:
+
+			sudo pacman-key --populate archlinux
+
+		Retry adding, verifing and signing Vi0L0's key
+
+Finally update the repositories along with the system:
+
+	sudo pacman -Syu
+
+----------------------------------------------------------------------------------
+
+To enable AUR packages you have to install a separe package manager in order to
+handle user repositories. Below are described 2 options to choose from or be
+used alongside. Generally 'pacaur' is considered a better option than 'yaourt'.
+
+----------
+| Pacaur |
+----------
+
+First install package dependancies that are required to build 'auracle-git' and 'pacaur':
+
+	sudo pacman -S expac yajl git meson gtest gmock jq
+
+Then 'auracle git' package is needed to be built before 'pacaur'. Both need access to the
+git repository in order to get their PKGBUILD scripts so first add the appropriate gpg key:
+
+	gpg --recv-keys --keyserver hkp://pgp.mit.edu 1EB2638FF56C0C53
+
+then make a directory for auracle-git and change into it:
+
+	mkdir ~/auracle-git
+	cd ~/auracle-git
+
+Get the PKGBUILD script for auracle-git:
+
+	curl -o PKGBUILD https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=auracle-git
+
+and build and install running the 'makepkg':
+
+	makepkg -i PKGBUILD
+
+Similarly create a direcory to build 'pacaur':
+
+	cd ../
+	mkdir ~/pacaur
+	cd ~/pacaur
+
+Get the PKGBUILD:
+
+	curl -o PKGBUILD https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=pacaur
+
+and build and install:
+
+	makepkg -i PKGBUILD	
+
+----------
+| Yaourt |
+----------
+
+To add 'yaourt' open the pacman configuration file:
+
+	sudo nano /etc/pacman.conf
+
+and add the end:
+
+	[archlinuxfr]
+	SigLevel = Never
+	Server = http://repo.archlinux.fr/$arch
+
+then refresh the repositories:
+
+	sudo pacman -Syu
+
+Finally install 'yaourt':
+
+	sudo pacman -S yaourt
+
+and 'pamac' as front end GUI:
+
+	sudo pacman -S pamac-aur
+
+----------------------------------------------------------------------------------
+
+NOTE: To speed up the AUR building process you can disable the compression step by
+      editing the makepkg.conf file:
+
+      	sudo nano /etc/makepkg.conf
+
+      and changing the following line:
+
+      	PKGEXT='.pkg.tar.xz'
+
+      to:
+
+      	PKGEXT='.pkg.tar'
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Audio
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install 'pulseaudio' server with 'ALSA' backend:
+
+	sudo pacman -S pulseaudio pulseaudio-alsa alsa-utils
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Display server
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install 'xorg':
+
+	sudo pacman -S xorg-server xorg-xinit
+
+NOTE: If you added the xorg repository in the pacman.conf mentioned above and you
+      might get an unresolved dependency from the libxfont package that's missing from
+      the repository. You can search for the package online, download it in your home
+      folder and install it with the following command:
+
+      	sudo pacman -U libxfont-[version]-x86_64.pkg.tar.xz
+
+---------------------------------
+| ATI GPU with Catalyst Drivers |
+----------------------------------------------------------------------------------
+
+To install the Catalyst drivers you must replace the "mesa" package with the
+"mesa-noglvnd" package.
+
+Install wget:
+
+	sudo pacman -S wget
+
+Download the mesa-noglvnd snapshot:
+
+	wget https://aur.archlinux.org/cgit/aur.git/snapshot/mesa-noglvnd.tar.gz
+
+uncompress it:
+
+	tar -zxvf mesa-noglvnd.tar.gz
+
+switch to extraction folder:
+
+	cd mesa-noglvnd
+
+install Wayland Protocols dependency:
+
+	sudo pacman -S wayland-protocols
+
+and build the package with no PGP verification:
+
+	makepkg -s --skippgpcheck
+
+Finally install the package and remove the mesa conflicting package when asked:
+
+	sudo pacman -U  mesa-noglvnd.*.pkg.tar.xz
+
+Switch to upper directory:
+
+	cd ../
+
+Now we must repeat the same procedure for the lib32-mesa-noglvnd.
+Download the mesa-noglvnd snapshot:
+
+	wget https://aur.archlinux.org/cgit/aur.git/snapshot/lib32-mesa-noglvnd.tar.gz
+
+uncompress it:
+
+	tar -zxvf lib32-mesa-noglvnd.tar.gz
+
+switch to extraction folder:
+
+	cd lib32-mesa-noglvnd
+
+build the package with no PGP verification:
+
+	makepkg -s --skippgpcheck
+
+Install the package:
+
+	sudo pacman -U  lib32-mesa-noglvnd.*.pkg.tar.xz
+
+----------------------------------------------------------------------------------
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Touchpad
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+Install touchpad drivers:
+
+	sudo pacman -S xf86-input-synaptics
+
+NOTE: If the touchpad natural/reverse scrolling is not working properly then you
+      can remap its functions through xinput. This can be checked later in the
+      desktop environment functionality.
+
+First install xinput:
+
+	sudo pacman -S xorg-xinput
+
+then check the synaptics device id with:
+	
+	xinput list
+
+Check the key mappings:
+
+	xinput get-button-map [device_id]
+
+and set them again but switch the order of 4 and 5
+
+	xinput set-button-map [device_id] [switched_order]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Graphics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Depending on the hardware vendor of the GPU the according packages need
+to be installed:
+
+VMWare:
+
+	sudo pacman -S xf86-video-vmware
+
+Intel:
+
+	sudo pacman -S xf86-video-intel
+
+NVIDIA:
+
+	sudo pacman -S nvidia nvidia-utils lib32-nvidia-utils nvidia-settings
+
+------------------------------------
+| ATI GPU with Open Source Drivers |
+----------------------------------------------------------------------------------
+	
+For newer cards (AMD Radeon Rx Series and later) install the following package:
+
+	sudo pacman -S xf86-video-amdgpu
+
+For older cards install:
+
+	sudo pacman -S xf86-video-ati
+
+----------------------------------------------------------------------------------
+	
+---------------------------------
+| ATI GPU with Catalyst Drivers |
+----------------------------------------------------------------------------------
+
+The Catalyst driver doesn't work with the latest kernel and this is the main reason that
+you cannot use a custom repository like the one used for Xorg. To proceed with you must
+first switch to the LTS kernel in order to install the catalyst package.
+
+NOTE: Because the kernel switching requires a grub configuration update that will overwrite
+      the current one, you need to ensure that other OS in the system that reside in different
+      partitions are mounted. If these partitions are formated with a NTFS filesystem 
+
+Install the LTS kernel version:
+
+	sudo pacman -S linux-lts linux-lts-headers
+
+Remove the default kernel:
+
+	sudo pacman -R linux
+
+Next you need to update the Grub configuration:
+
+	sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+Reboot into the new kernel:
+
+	sudo reboot
+
+Login and re-enable networking as mentioned above in the begining of this section.
+
+Download the catalyst-total snapshot:
+
+	wget https://aur.archlinux.org/cgit/aur.git/snapshot/catalyst-total.tar.gz
+
+uncompress it:
+
+	tar -zxvf catalyst-total.tar.gz
+
+switch to extraction folder:
+
+	cd catalyst-total
+
+edit the PKGBUILD:
+
+	nano PKGBUILD
+
+go to the depends section and change 'linux>=3.0', 'linux<4.14' and 'linux-headers' to
+'linux-lts>=3.0', 'linux-lts<4.14' and 'linux-lts-headers' accordingly.
+
+Build the package:
+
+	makepkg -s
+
+Install the package:
+
+	sudo pacman -U  catalyst-total.*.pkg.tar.xz
+
+and remove the libglvnd package when prompted.
+
+Create a default configuration:
+
+	sudo aticonfig --initial
+
+----------------------------------------------------------------------------------
+
+---------------------
+| Dual GPU Switcher |
+----------------------------------------------------------------------------------
+
+For configurations that use Intel/NVIDIA GPU switching for low and high
+performance, 'bumblebee' and 'primus' can be used to handle these setups.
+Install both packages:
+
+	sudo pacman -S bumblebee bbswitch primus
+
+then add the desired user(s) to the bumblebee group:
+
+	sudo gpasswd -a [username] bumblebee
+
+and finally enable the service:
+
+	sudo systemctl enable bumblebeed
+
+NOTE: When using 'bumblebee' applications can utilize the NVIDIA GPU by executing
+      through 'optirun'. For example:
+
+      	optirun glxgears -info
+
+      Also to check the status of the NVIDIA card run:
+
+      	sudo cat /proc/acpi/bbswitch
+
+      to manually turn it on run:
+
+      	sudo tee /proc/acpi/bbswitch <<< ON
+
+      and to manually turn it off:
+
+      	sudo tee /proc/acpi/bbswitch <<< OFF
+
+----------------------------------------------------------------------------------
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Bluetooth
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install the bluez package:
+
+	sudo pacman -S bluez bluez-utils
+
+and enable the bluetooth service:
+
+	sudo systemctl enable bluetooth
+
+To enable proper bluetooth functionality under KDE you have to add a specific kernel
+parameter at boot. Open the grub defalut configuration file:
+
+	sudo nano /etc/default/grub
+
+and add the parameter:
+
+	bluetooth.disable_ertm=1
+
+at the GRUB_CMDLINE_LINUX_DEFAULT variable. E.g.
+
+	GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet bluetooth.disable_ertm=1"
+
+then regenerate the grub configuration:
+
+	sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+VMWare Tools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To enable host-guest features provided by VMWare install the Open-VM-Tools package
+
+	sudo pacman -S open-vm-tools gtkmm3
+
+Since Open-VM-Tools reads version information from /etc/arch-release, which is empty
+we need to update it with valid information:
+
+	sudo sh -c 'cat /proc/version > /etc/arch-release'
+
+Enable the Open-VM-Tools services:
+
+	sudo systemctl enable vmtoolsd
+	sudo systemctl enable vmware-vmblock-fuse
+
+_________________________________________
+      __   ___     __   ___ ___       __
+|__/ |  \ |__     /__` |__   |  |  | |__)
+|  \ |__/ |___    .__/ |___  |  \__/ |
+_________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+KDE Desktop
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install KDE package:
+
+	sudo pacman -S plasma dolphin dolphin-plugins konsole
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Network Manager
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enable the Network Manager:
+
+	sudo systemctl enable NetworkManager
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Login Manager
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enable login manager:
+
+	sudo systemctl enable sddm
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reboot to start using the KDE Desktop Environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Reboot to your new system:
+
+	reboot
+
+___________________________________________________________________________________________
+ __        __     __      __        __             __   ___  __      __   ___ ___       __
+|__)  /\  /__` | /  `    |__)  /\  /  ` |__/  /\  / _` |__  /__`    /__` |__   |  |  | |__)
+|__) /~~\ .__/ | \__,    |    /~~\ \__, |  \ /~~\ \__> |___ .__/    .__/ |___  |  \__/ |
+___________________________________________________________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NTFS Partitions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install NTFS-3G:
+
+	sudo pacman -S ntfs-3g
+
+To automount NTFS partitions add a following line to the /etc/fstab file:
+
+# /dev/[disk]
+UUID=[UUID]	[mount_point]  ntfs-3g   [nofail,]uid=[username],gid=users    0       0
+
+Options:
+	UUID			UUID is prefered over /dev/[disk] for example to ensure that altering the physical
+					arrange of the drives does not affect the system. UUID can be retrived by the following
+					command:
+
+						ls -l /dev/disk/by-uuid
+					
+	mount_point		The directory path to mount the partition
+	nofail			Add this to avoid boot halt if the may not be present
+	username		Gives write permission to the specified user
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+KDE Startup Script
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To execute anything you may need to configure after logging in through sddm just
+create a config.sh script to the following path:
+
+	echo '#/bin/bash' > ~/.config/plasma-workspace/env/config.sh
+
+and fill it with whatever customization suit your needs.
+
+To change the default terminal editor from vi to nano add the following line to the
+confih.sh file:
+
+		export EDITOR=nano
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+KDE sudo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To have root privileges in GUI applications you need to install kdesudo:
+
+	pacaur -S kdesudo
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fonts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install true-type fonts:
+
+	sudo pacman -S ttf-dejavu ttf-liberation
+
+Install fonts for japanese characters:
+
+	sudo pacman -S noto-fonts-cjk
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Linux Headers 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In order to support DKMS in packages that support them linux headers should be
+installed:
+
+	sudo pacman -S linux-headers
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Java
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+Install OpenJDK implementation of Java SE:
+
+	sudo pacman -S jre-openjdk-headless jre-openjdk jdk-openjdk openjdk-doc openjdk-src
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Archive Management
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+Install Ark archive manager with .zip, .rar, .7z, .tar support:
+
+	pacaur -S ark p7zip zip tar rar
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Text Editor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+Install Sublime Text Editor:
+
+	pacaur -S sublime-text-dev
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Browsers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Google Chrome with Flash support:
+
+	pacaur -S google-chrome pepper-flash
+
+Install Firefox with Flash support:
+
+	sudo pacman -S firefox flashplugin
+
+____________________________________________
+                ___          ___  __
+ |\/| |  | |     |  |  |\/| |__  |  \ |  /\
+ |  | \__/ |___  |  |  |  | |___ |__/ | /~~\
+____________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Image Viewers and Editors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install the default KDE image viewing application:
+
+	sudo pacman -S gwenview
+
+and optionally for quick editing with batch support:
+
+	pacaur -S xnviewmp
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Codecs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To enable GStramer playback for most encodings install the following plugins:
+
+	sudo pacman -S gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
+
+FFMpeg:
+
+	sudo pacman -S ffmpeg
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Audio Players
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Clementine:
+
+	sudo pacman -S clementine
+
+To install Spotify first you must add the following gpg key:
+
+	gpg --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 A87FF9DF48BF1C90
+
+and then install from AUR:
+
+	pacaur -S spotify
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Video Players
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install VLC:
+
+	sudo pacman -S vlc
+
+NOTE: If the VLSub plugin doesn't download subtitles make sure the ~/.cache/vlc
+      folder exists. Also to avoid stutter in HD videos go to Tools -> Preferences
+      then choose Video and enable the advanced view settings. Then select
+      Input/Codecs go to the Advanced section and increase File caching to 1000.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Disc Media 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install k3b:
+
+	sudo pacman -S k3b cdrtools dvd+rw-tools vcdimager
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Remote Control
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install KDE Connect to control your desktop from your mobile:
+
+	sudo pacman -S kdeconnect
+
+NOTE: You need to install the same app on your mobile in order to pair the
+      devices and control your desktop.
+
+__________________________
+ __   ___  ___    __   ___
+/  \ |__  |__  | /  ` |__
+\__/ |    |    | \__, |___
+__________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Office (Word,Excel, Powerpoint, PDF)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+One of the best alternatives to Microsoft Office is WPS:
+
+	pacaur -S wps-office ttf-wps-fonts
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PDF Viewer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install evince:
+
+	sudo pacman -S evince
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Mail Client
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Thunderbird:
+
+	sudo pacman -S thunderbird
+
+WARNING: As part of sending a message the SMTP server sends a HELO or EHLO command to
+         Thunderbird. If your PC is behind a NAT box or a router it may send your PC's
+         IP address instead of a RFC2822 compliant "Fully Qualified Domain Name"
+         (FQDN) in its reply. Whichever value it sends is included in the messages headers.
+
+         To change this go to Tools -> Options -> Advanced -> General -> Config Editor
+
+         Search for "smtp" and find the entries that match the following pattern:
+
+         	mail.smtpserver.smtp[number].description
+
+         For each of these entries create a new string record with the pattern:
+
+         	mail.smtpserver.smtp[number].hello_argument
+
+         using the same [number] that exists in the description entry and give it a
+         value you like. To avoid getting blocked by SPF and SpamAssasin your value
+         should share the domain name of your smtp. You can check the smtp address
+         from the following record in the Config Editor:
+
+         	mail.smtpserver.smtp[number].hostname
+
+         If this value is something like:
+
+         	[smtp].[mail_provider].com
+
+         your hello arguement value should be:
+
+         	[whatever_you_want].[mail_provider].com
+
+___________________________________________________
+ __   __                  __        __          __
+|  \ /  \ |  | |\ | |    /  \  /\  |  \ | |\ | / _`
+|__/ \__/ |/\| | \| |___ \__/ /~~\ |__/ | | \| \__>
+___________________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Torrents
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install qBitTorrent:
+
+	sudo pacman -S qbittorrent
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+P2P
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Soulseek:
+
+	pacaur -S soulseekqt
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Direct Connect
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install EiskaltDC++:
+
+	pacaur -S eiskaltdcpp-qt
+
+__________________________________
+ __            ___ ___         __
+/  ` |__|  /\   |   |  | |\ | / _`
+\__, |  | /~~\  |   |  | | \| \__>
+__________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Viber
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Viber:
+
+	pacaur -S viber
+
+If the messaging sounds are making cracking noises then edit the following file:
+
+	sudo nano /etc/pulse/default.pa
+
+Find the line:
+
+	load-module module-udev-detect
+
+and add to the end "tsched=0". e.g.:
+
+	load-module module-udev-detect tsched=0 
+
+Finally save and restart
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Skype
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Skype:
+
+	pacaur -S skypeforlinux-preview-bin
+
+______________________________________________
+ __        __        __      __            __
+/  ` |    /  \ |  | |  \    /__` \ / |\ | /  `
+\__, |___ \__/ \__/ |__/    .__/  |  | \| \__,
+______________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dropbox
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To install Dropbox first the appropriate gpg key must be imported:
+
+	gpg --recv-keys 1C61A2656FB57B7E4DE0F4C1FC918B335044912E
+
+and the install the package:
+
+	pacaur -S gendesk dropbox 
+
+Integration with dolphin on KDE is available through the dolphin-plugins package
+
+NOTE: Dropbox is not supporting NTFS locations for syncing your contents. If you
+      want to save space in a dual boot system and use the same NTFS location in
+      both Windows and Linux you can bypass that limitation by making a symbolic link
+      of the parent folder you want to sync in the NTFS partition to your home
+      directory. The Dropbox client will not complain about the partition filesystem.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Google Drive
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-----------------------------
+| Commercial Option: InSync |
+----------------------------------------------------------------------------------
+
+Install InSync:
+
+	pacaur -S insync
+
+----------------------------------------------------------------------------------
+
+----------------------------------------
+| Non-Commercial (Free) Option: Grive2 |
+----------------------------------------------------------------------------------
+
+Install Grive2:
+
+	pacaur -S grive
+
+Go to the root folder you wish to sync and run:
+
+	grive -a
+
+After the authentication grive will start syncing all directories.
+
+NOTE: This application does not actively monitor the filesystem for changes
+      so you have to manually run each time the command in order to sync your files.
+
+To avoid syncing the grive configuration files that reside in the directory if
+you use the same folder for syncing from a different OS move them to your home
+directory.	First create a folder for grive in your home directory:
+
+	mkdir ~/.grive
+
+and then move the files:
+
+	mv [path/to/google/drive/folder]/.grive ~/.grive/.grive
+	mv [path/to/google/drive/folder]/.grive_state ~/.grive/.grive_state
+
+Finally create soft symlinks back to the Google Drive folder in order
+to keep grive functional:
+
+	ln -s ~/.grive/.grive [path/to/google/drive/folder]/.grive
+	ln -s ~/.grive/.grive_state [path/to/google/drive/folder]/.grive_state
+
+----------------------------------------------------------------------------------
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+OneDrive
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-----------------------------
+| Commercial Option: InSync |
+----------------------------------------------------------------------------------
+
+Install InSync:
+
+	pacaur -S insync
+
+------------------------------------------------------
+| Non-Commercial (Free) Option: OneDrive Free Client |
+----------------------------------------------------------------------------------
+
+Install OneDrive free client:
+
+	 pacaur -S onedrive-abraunegg
+
+Then run:
+
+	onedrive --syncdir [/path/to/your/sync/directory]
+
+The first time this command will ask you for authentication and then start syncing.
+To enable live monitoring add the following line to ~/.config/plasma-workspace/env/config.sh:
+
+	onedrive --syncdir [/path/to/your/sync/directory] --monitor &
+
+______________________________________________________________________________________
+      __                  __  ___  __       ___         ___    ___  __   __        __
+ /\  |  \  |\/| | |\ | | /__`  |  |__)  /\   |  | \  / |__      |  /  \ /  \ |    /__`
+/~~\ |__/  |  | | | \| | .__/  |  |  \ /~~\  |  |  \/  |___     |  \__/ \__/ |___ .__/
+______________________________________________________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Partition Editor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install GParted
+
+	sudo pacman -S gparted
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Wine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Wine Staging:
+
+	sudo pacman -S wine-staging
+
+Install support for Internet Explorer:
+
+	sudo pacman -S wine_gecko
+
+Install support for .NET:
+
+	sudo pacman -S wine-mono
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SSH
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install ssh server:
+
+	sudo pacman -S openssh
+
+Enable the server:
+
+	sudo systemctl enable sshd
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FTP Client
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install FileZilla
+
+	sudo pacman -S filezilla
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TeamViewer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install TeamViewer:
+
+	pacaur -S teamviewer
+
+Install 32bit library dependency:
+
+	sudo pacman -S lib32-dbus
+
+Enable and start the TeamViewer service:
+
+	sudo systemctl enable teamviewerd
+	sudo systemctl start teamviewerd
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SAMBA (Windows Sharing)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Samba:
+
+	sudo pacman -S samba
+
+Install wget if not present:
+
+	sudo pacman -S wget
+
+and retrive a sample sambe configuration:
+
+	sudo sh -c 'wget "https://git.samba.org/samba.git/?p=samba.git;a=blob_plain;f=examples/smb.conf.default;hb=HEAD" -O /etc/samba/smb.conf'
+
+Open the /etc/samba/smb.conf for edit and configure the basic server settings such as
+workgroup, server string,server role, hosts allow etc. according to your prefered setup.
+
+----------------------
+| User Configuration |
+----------------------
+
+NOTE: Samba needs an existing system account but uses a different password from
+      that of the account
+
+Add a user:
+
+	sudo smbpasswd -a [system_account]
+
+and setup its password:
+
+	sudo smbpasswd [system_account]
+
+------------------------
+| Shares Configuration |
+------------------------
+
+NOTE: You can either define a specific share based on the examples in the file or create a
+      useshare path that allows non-root users to manage their own share definitions. On KDE
+      it's recommended because this can be configured through Dolphin File Manager.
+
+To handle shares in KDE through Dolphin install:
+
+	sudo pacman -S kdenetwork-filesharing
+
+------------------
+| usershare path |
+----------------------------------------------------------------------------------
+
+Create the usershare directory:
+
+	sudo mkdir -p /var/lib/samba/usershare
+
+Create the group to manage it:
+
+	sudo groupadd -r sambashare
+
+Change ownership of the usershare directory:
+
+	sudo chown root:sambashare /var/lib/samba/usershare
+
+Change permissions of the usershare directory:
+
+	sudo chmod 1770 /var/lib/samba/usershare
+
+Add the following section to /etc/samba/smb.conf
+
+	[global]
+	usershare path = /var/lib/samba/usershare
+	usershare max shares = 100
+	usershare allow guests = yes
+	usershare owner only = yes
+
+Finally add your user to the sambashare group:
+
+	sudo gpasswd sambashare -a [system_account]
+
+Finally enable smbd and nmbd services to start on system boot:
+
+	sudo systemctl enable smb
+	sudo systemctl enable nmb
+
+and restart your system to share any folder you want through Dolhin file manager.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+File Checker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install cksfv:
+
+	sudo pacman -S cksfv
+
+NOTE: This is a terminal command line tool. Check --help for usage
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+File Encryption
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install AES Crypt:
+
+	pacaur -S aescrypt
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Hardware Sensors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install lm_sensors:
+
+	sudo pacman -S lm_sensors
+
+and configure them with root privileges:
+
+	sudo sensors-detect
+
+IMPORTANT: It's highly recommended to set for every promt of the above command the
+           default values to avoid system instabilities.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Wireshark
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Wireshark
+
+	sudo pacman -S wireshark-qt
+
+_________________________________________________________________________________
+ __   ___       ___       __   __         ___      ___    ___  __   __        __
+|  \ |__  \  / |__  |    /  \ |__)  |\/| |__  |\ |  |      |  /  \ /  \ |    /__`
+|__/ |___  \/  |___ |___ \__/ |     |  | |___ | \|  |      |  \__/ \__/ |___ .__/
+_________________________________________________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Versioning Tools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Subversion (SVN):
+
+	sudo pacman -S subversion
+
+Install Git with GUI:
+
+	pacaur -S git gitkraken
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Diff Tools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-------------------------------------
+| Commercial Option: Beyond Compare |
+----------------------------------------------------------------------------------
+
+Install from AUR:
+
+	pacaur -S bcompare
+
+----------------------------------------
+| Non-Commercial (Free) Option: KDiff3 |
+----------------------------------------------------------------------------------
+
+Install KDiff3:
+
+	sudo pacman -S kdiff3
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Visual Studio Code
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Visual Studio Code:
+
+	pacaur -S visual-studio-code-bin icu55
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.NET Core
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install .NET Core SDK to build and run .NET Core applications:
+
+	sudo pacman -S dotnet-sdk
+
+and add the following environmental variable to the ~/.config/plasma-workspace/env/config.sh
+script:
+
+	export DOTNET_CLI_TELEMETRY_OPTOUT=1
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Go Lang
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Go and Go Tools:
+
+	sudo pacman -S go go-tools
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Jetbrains Development Tools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+------------
+| Java IDE |
+------------
+
+Install IntelliJ Idea:
+
+	sudo pacman -S intellij-idea-community-edition
+
+--------------
+| Python IDE |
+--------------
+
+Install PyCharm:
+
+	sudo pacman -S pycharm-community-edition
+
+-----------------------
+| C# IDE (Commercial) |
+-----------------------
+
+Install Rider:
+
+	pacaur -S rider
+
+-----------------------
+| Go IDE (Commercial) |
+-----------------------
+
+Install Rider:
+
+	pacaur -S goland
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+HTTP Server
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install Apache:
+
+	sudo pacman -S apache
+
+and start/enable the service:
+
+	sudo systemctl start httpd
+	sudo systemctl enable httpd
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PHP
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install PHP with Apache integration:
+
+	pacaur -S php php-cgi php-apache php-odbc php-docs
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MySQL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+----------------
+| MySQL Server |
+----------------
+
+ Install MariaDB:
+
+ 	sudo pacman -S mariadb
+
+Initialize MariaDB data directory:
+
+ 	sudo mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+
+Enable and start the mariadb:
+
+	sudo systemctl enable mariadb
+	sudo systemctl start mariadb
+
+Execute the secure installation script:
+
+	sudo mysql_secure_installation
+
+Optionally create a user with root privileges for remote access. Start MySQL CLI:
+
+	mysql -u root -p
+
+Create the new user:
+
+	CREATE USER '[username]'@'%' IDENTIFIED BY '[password]';
+
+and grant all previleges:
+
+	GRANT ALL PRIVILEGES ON *.* TO '[username]'@'%' IDENTIFIED BY '[password]' WITH GRANT OPTION;
+
+replacing [username] and [password] to whatever you like. Finally flush privileges:
+
+	FLUSH PRIVILEGES;
+
+and exit the MySQL CLI:
+
+	quit
+
+----------------
+| MySQL Client |
+----------------
+
+Install DBeaver for database administration:
+
+	sudo pacman -S dbeaver
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Microsoft SQL Server
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Install MSSQL Server and Tools
+
+	pacaur -S mssql-server mssql-tools
+
+and afterwards run the configuration
+ 
+	sudo /opt/mssql/bin/mssql-conf setup
+
+____________________________________________________________
+      __   __                     __      ___  ___  ___
+|    /  \ /  \ |__/     /\  |\ | |  \    |__  |__  |__  |
+|___ \__/ \__/ |  \    /~~\ | \| |__/    |    |___ |___ |___
+____________________________________________________________
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+KDE - Application Uniformity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+After selecting themes and application styles in KDE, just make sure to configure the 
+GNOME application style to have uniformity between KDE and GTK apps. If you want applications
+that started with elevated privilleges (kdesudo) to share the same theme, make sure to
+configure the theme settings in the root user accordingly.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Alternate Console
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	
+A more fancy console that looks like a FPS game console is tilda. To install it:
+
+	sudo pacman -S tilda
+
+To autostart the console on each session add the following line to the Plasma
+environment config file in ~/.config/plasma-workspace/env/config.sh:
+
+	sleep 7 && tilda &
+
+and make sure that you select to start the tilda hidden in its option settings.
+You can change the sleep seconds value according to your system performance to
+ensure that the KDE workspace is loaded before tilda starts.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SDDM Video Background
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+NOTE: First make sure you have installed the GStreamer plugins mention before to ensure
+      playback functionality.
+
+Make a copy from the default breeze theme:
+
+	sudo cp -r /usr/share/sddm/themes/breeze /usr/share/sddm/themes/breeze-video
+
+Modify the /usr/share/sddm/themes/breeze-video/metadata.desktop file and change the following:
+
+	Name=Breeze Video
+	Description=Breeze Video Theme
+	Theme-Id=breeze-video
+
+Modify the /usr/share/sddm/themes/breeze-video/Main.qml file and add the following import:
+
+	import QtMultimedia 5.6
+
+and add the following objects inside the main PlasmaCore.ColorScope object:
+
+	MediaPlayer {
+        id: mediaplayer
+        autoPlay: true
+        loops: MediaPlayer.Infinite
+        source: config.background
+    }
+
+    VideoOutput {
+        fillMode: VideoOutput.PreserveAspectCrop
+        anchors.fill: parent
+        source: mediaplayer
+    }
+
+Then select the Breeze Video theme from system settings and select the video you prefer as image background
