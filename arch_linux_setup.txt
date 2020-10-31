@@ -131,7 +131,7 @@ Base system configuration
 If the base pacstrap commmand did not install the linux image package you can install
 it with:
 
-	pacman -S linux
+	pacman -S linux linux-firmware
 
 ----------
 | Editor |
@@ -196,11 +196,12 @@ Boot loader
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	
 Install grub boot loader:
-	pacman -S grub os-prober [efibootmgr] [intel-ucode]
+	pacman -S grub os-prober [efibootmgr] [intel-ucode] [amd-ucode]
 
 NOTES: 'efibootmgr' is used for UEFI boot setup
        'os-prober' is used for other OS detection
        'intel-ucode' is for Intel CPU systems to enable micro-code updates
+       'amd-ucode' is for AMD CPU systems to enable micro-code updates
 
 ---------------
 | Legacy BIOS |
@@ -419,7 +420,7 @@ Finally update the repositories along with the system:
 
 ----------------------------------------------------------------------------------
 
-To enable AUR packages you have to install a separe package manager in order to
+To enable AUR packages you have to install a separate package manager in order to
 handle user repositories. Below are described 2 options to choose from or be
 used alongside. Generally 'pacaur' is considered a better option than 'yaourt'.
 
@@ -720,8 +721,36 @@ Create a default configuration:
 ----------------------------------------------------------------------------------
 
 For configurations that use Intel/NVIDIA GPU switching for low and high
-performance, 'bumblebee' and 'primus' can be used to handle these setups.
-Install both packages:
+performance there are several options available. Optimus Manager is the
+best option regarding GPU performance while Bumblebee is anonther option
+that allows switching but lower performance. Other options are also available
+but these two do not require any xorg.conf file editing and work well with X11
+autodetection.
+
+-------------------
+| Optimus Manager |
+-------------------
+
+Optimus Manager is better for performance over battery life and does not require
+any special commands to allow processes to access the NVIDIA GPU. The only downside
+is that switching requires loging out and loging in, which is inconvenient when
+running multiple applications.
+
+Install the optimus
+
+	pacaur -S optimus-manager optimus-manager-qt
+
+and restart. Afterwards use the manager applet indicator to switch between GPUs.
+
+-------------
+| Bumblebee |
+-------------
+
+Bumblebee can switch between GPUs on the fly but this method takes a toll on
+NVIDIA GPU performance. Also it requires an additional command (optirun) to
+enable the NVIDIA GPU.
+
+Install the following packages:
 
 	sudo pacman -S bumblebee bbswitch primus
 
@@ -875,7 +904,7 @@ KDE Startup Script
 To execute anything you may need to configure after logging in through sddm just
 create a config.sh script to the following path:
 
-	echo '#/bin/bash' > ~/.config/plasma-workspace/env/config.sh
+	echo '#!/bin/bash' > ~/.config/plasma-workspace/env/config.sh
 
 and fill it with whatever customization suit your needs.
 
@@ -885,12 +914,18 @@ confih.sh file:
 		export EDITOR=nano
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-KDE sudo
+Bash Shell
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To have root privileges in GUI applications you need to install kdesudo:
+To enable autocomplete in bash when using sudo add the following line in the
+~/.bashrc file:
 
-	pacaur -S kdesudo
+	complete -cf sudo
+
+also to remove cached AUR packages as well as unused packages from the official
+repositories add a handy alias:
+
+	alias pacman-clean="pacaur -Scc && sudo pacman -Rsn $(pacman -Qdtq)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Fonts
@@ -903,6 +938,14 @@ Install true-type fonts:
 Install fonts for japanese characters:
 
 	sudo pacman -S noto-fonts-cjk
+
+Optionally add Windows Fonts from Windows partition:
+
+	ln -s [WINDOWS_MOUNT_PATH]/Windows/Fonts/ /usr/share/fonts/WindowsFonts
+
+and regenerate the font cache:
+
+	fc-cache --force
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Linux Headers 
@@ -963,9 +1006,13 @@ Install the default KDE image viewing application:
 
 	sudo pacman -S gwenview
 
-and optionally for quick editing with batch support:
+Install Gimp if you need a Photoshop alternate solution:
 
-	pacaur -S xnviewmp
+	sudo pacman -S gimp
+
+Finally for screen capture you can install flameshot:
+
+	sudo pacman -S flameshot
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Codecs
@@ -989,7 +1036,7 @@ Install Clementine:
 
 To install Spotify first you must add the following gpg key:
 
-	gpg --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 A87FF9DF48BF1C90
+	curl -sS https://download.spotify.com/debian/pubkey_0D811D58.gpg | gpg --import -
 
 and then install from AUR:
 
@@ -1040,6 +1087,13 @@ Office (Word,Excel, Powerpoint, PDF)
 One of the best alternatives to Microsoft Office is WPS:
 
 	pacaur -S wps-office ttf-wps-fonts
+
+To add spell checking for additional languages if they exists in the AUR repository
+you need to install:
+
+	pacaur -S wps-office-extension-[language]-dictionary
+
+where [language] could be french, german, greek, italan etc.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 PDF Viewer
@@ -1169,7 +1223,7 @@ To install Dropbox first the appropriate gpg key must be imported:
 
 and the install the package:
 
-	pacaur -S gendesk dropbox 
+	pacaur -S gendesk dropbox
 
 Integration with dolphin on KDE is available through the dolphin-plugins package
 
@@ -1479,7 +1533,30 @@ Diff Tools
 
 Install from AUR:
 
-	pacaur -S bcompare
+	pacaur -S bcompare bcompare-kde5
+
+Go to the install directory:
+
+	cd /usr/lib/beyondcompare/
+
+RXhlY3V0ZSB0aGUgZm9sbG93aW5nIGNvbW1hbmQgaW4gb3JkZXIgdG8gcGF0Y2ggdGhlIGV4ZWN1dGFibGUgYW5kIHVzZSB0aGUgWldUIGtleWdlbjoKCglzdWRvIHNlZCAtaSAicy9rZWV4akVQM3Q0TXVlMjNocm51UHRZNFRkY3NxTmlKTC01MTc0VHNVZExtSlNJWEtmRzJOR1B3Qkw2dm5SUGRkVDd0SDI5cXBrbmVYNjNETzlFQ1NQRTlyelkxemhUaEhFUmc4bEhNOUlCRlQrclZ1aVk4MjNhUUp1cXp4Q0tJRTFiY0RxTTR3Z1cwMUZINm9DQlAxRzR1YjAxeG1iNEJHU1VHNlpyanhXSEp5Tkx5SWxHdk9ob1kySEFZekV0ellHd3hGWm4ySlo2Nm80Uk9Oa1hqWDBERjlFenNkVWVmM1VBUytKUStmQ1lSZUxhd2RqRWU2dFhDdjg4R0thYVBLV3hDZWFVTDlQZWpJQ1FnUlFPTEdPWnRaUWtMZ0FlbHJPdGVoeHo1QU5PT3FDYUpneTJtSkxRVkxNNVNKOURsaTkwOWM1eWJ2RWhWbUlDMGRjOWRXSCsvTjlLbWlMVmxLTVU3UkpxbkUrV1hFRVBJMVNnZ2xtZm1MYzF5Vkg3ZHFCYjllaE9vS0c5VUUrSEFFMVl2SDFYWDJYVkdlRXFZVVktVHNrN1lCVHowV3BTcG9ZeVBneDZJa2k1S0x0UTVHLWFLUDlleXNua3VPQWtydkhVOGJMYkd0WnRlR3dKYXJldjAzUGhmQ2lvSkw0T1Nxc21RR0V2RGJIRkViTmwxcUp0ZHdFcmlSK1ZOWnRzOXZOTkxrN1VHZmVOd0lpcXB4ams0TW4wOW5tU2Q4RmhNNGlmdmNhSWJOQ1JvTVBHbDZLVTEyaXNlU2Urdysxa0ZzTGhYK09oUU04V1hjV1YxMGNHcUJ6UUU5T3FPTFVjZzluMGtyclIzS3JvaHN0UzlzbVR3RXg5b2x5TFlwcHZDMHA1aTdkQXgyZGVXdk0xWnhLTnMwQnZjWEd1a1IrL2ciIEJDb21wYXJlCgpVc2UgWldUIGtleWdlbiB3aXRoIHdpbmUgdG8gcmVnaXN0ZXIuLi4gYW5kIHJlcGVhdCB0aGlzIHByb2Nlc3MgYWZ0ZXIgZWFjaCB1cGRhdGU=
+
+NOTE: This application doesn't work very well with dark themes. To force the default
+      Breeze Color Scheme on this application only select it and apply it under the
+      Sytem Settings -> Color dialog. Then create a backup of the current kde4 settings:
+
+      	cp -r ~/.kde4 ~/.kde4_alt
+
+      Then edit the bcompare script:
+
+      	sudo nano /usr/bin/bcompare
+
+      and add the following line after the #!/bin/sh line:
+
+      	export KDEHOME=/home/[username]/.kde4_alt
+
+      Then change back to your desired color scheme and open Beyond Compare
+      to test that it uses the default Breeze color scheme.
 
 ----------------------------------------
 | Non-Commercial (Free) Option: KDiff3 |
@@ -1501,11 +1578,42 @@ Install Visual Studio Code:
 .NET Core
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Install .NET Core SDK to build and run .NET Core applications:
+To use the latest .NET Core SDK install:
 
 	sudo pacman -S dotnet-sdk
 
-and add the following environmental variable to the ~/.config/plasma-workspace/env/config.sh
+Alternatively to install and use multiple versions of .NET Core create the
+installation folder:
+
+	sudo mkdir /opt/dotnet
+
+download the proper install script from Microsoft:
+
+	sudo wget -O /opt/dotnet/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
+
+make the script executable:
+
+	 sudo chmod +x /opt/dotnet/dotnet-install.sh
+
+and install versions you need by executing the script:
+
+	sudo /opt/dotnet/dotnet-install.sh --install-dir /opt/dotnet -channel [X.Y]
+
+where [X.Y] is the SDK version numbers. For example 3.0, 2.1... etc.
+
+Finally add the executable's path in the PATH variable by editing:
+
+	sudo nano /etc/profile
+
+and adding the following line:
+
+	appendpath '/opt/dotnet'
+
+before the 'unset appendpath' line. Restart and check the installed SDK versions:
+
+	dotnet --list-sdks
+
+Also add the following environmental variable to the ~/.config/plasma-workspace/env/config.sh
 script:
 
 	export DOTNET_CLI_TELEMETRY_OPTOUT=1
@@ -1538,6 +1646,14 @@ Install PyCharm:
 
 	sudo pacman -S pycharm-community-edition
 
+---------------------------
+| Python IDE (Commercial) |
+---------------------------
+
+Install PyCharm:
+
+	sudo pacman -S pycharm-professional
+
 -----------------------
 | C# IDE (Commercial) |
 -----------------------
@@ -1553,6 +1669,16 @@ Install Rider:
 Install Rider:
 
 	pacaur -S goland
+
+---------------------------------
+| Database Manager (Commercial) |
+---------------------------------
+
+Install Rider:
+
+	pacaur -S datagrip
+
+Tk9URTogVXNlIGpldGJyYWlucy1hZ2VudC1sYXRlc3RfdjMuMi4wXzIwMjAwNDEwIHBsdWdpbiBhbmQgYWN0aXZhdGUgd2l0aCBpdCdzIHByb3ZpZGVkCiAgICAgIHNlcmlhbCBudW1iZXIgdG8gYWN0aXZhdGUgYWxsIGNvbW1lcmNpYWwgSmV0YnJhaW5zIHByb2R1Y3RzLiBUaGlzIG1ldGhvZCB3b3JrcyB1cAogICAgICB0byB0aGUgZm9sbG93aW5nIHZlcnNpb25zOgoKICAgICAgCURhdGFncmlwIDIwMjAuMS4zLTIKICAgICAgCUdvbGFuZCAyMDIwLjEuMi0xCiAgICAgIAlQeWNoYXJtIFByb2Zlc3Npb25hbCAyMDIwLjEuMS0xCiAgICAgIAlSaWRlciAyMDIwLjEuMi0xCgogICAgICB0byBwcmV2ZW50IGFueSB1cGdyYWRlIGVkaXQgcGFjbWFuIGNvbmZpZ3VyYXRpb246CgogICAgICAJc3VkbyBuYW5vIC9ldGMvcGFjbWFuLmNvbmYKCiAgICAgIEZpbmQgdGhlIGxpbmUgd2l0aCB0aGUgSWdub3JlUGtnIHNldHRpbmcgYW5kIGFkZCB0aGUgcGFja2FnZSBuYW1lcyB5b3UgcHJlZmVyOgoKICAgICAgCUlnbm9yZVBrZyAgID0gcmlkZXIgZ29sYW5kIGRhdGFncmlwIHB5Y2hhcm0tcHJvZmVzc2lvbmFs
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 HTTP Server
@@ -1663,49 +1789,139 @@ A more fancy console that looks like a FPS game console is tilda. To install it:
 
 	sudo pacman -S tilda
 
-To autostart the console on each session add the following line to the Plasma
-environment config file in ~/.config/plasma-workspace/env/config.sh:
+To autostart the console on each session add a 'Program' entry to:
 
-	sleep 7 && tilda &
+	System Settings -> Startup and Shutdown -> Autostart
 
 and make sure that you select to start the tilda hidden in its option settings.
-You can change the sleep seconds value according to your system performance to
-ensure that the KDE workspace is loaded before tilda starts.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-SDDM Video Background
+HiDPI Monitors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-NOTE: First make sure you have installed the GStreamer plugins mention before to ensure
-      playback functionality.
+Using HiDPI monitors is usually not an issue and the proper scaling of most applications
+can be set by adjusting the following value:
 
-Make a copy from the default breeze theme:
+	System Settings -> Display and Monitor -> Display Configuration -> Global Scale
 
-	sudo cp -r /usr/share/sddm/themes/breeze /usr/share/sddm/themes/breeze-video
+Also you should check the font DPI setting under:
 
-Modify the /usr/share/sddm/themes/breeze-video/metadata.desktop file and change the following:
+	System Settings -> Fonts -> Force font DPI
 
-	Name=Breeze Video
-	Description=Breeze Video Theme
-	Theme-Id=breeze-video
+If the taskbar and tray icons are still rendered small you should add the following line
+in the ~/.config/plasma-workspace/env/config.sh script:
 
-Modify the /usr/share/sddm/themes/breeze-video/Main.qml file and add the following import:
+	export PLASMA_USE_QT_SCALING=1
 
-	import QtMultimedia 5.6
+--------------------------------------
+| Multiple Monitor Resolutions Setup |
+--------------------------------------
 
-and add the following objects inside the main PlasmaCore.ColorScope object:
+The tricky part is to properly setup scaling in monitors with different resolutions.
+By default the Global Scale setting will enlarge everything in smaller/normal resolution
+monitors if increased or leave everything tiny in HiDPI monitors if unchanged.
 
-	MediaPlayer {
-        id: mediaplayer
-        autoPlay: true
-        loops: MediaPlayer.Infinite
-        source: config.background
-    }
+Fortunately there is a way to use monitors with different resolutions and have a unified
+scalling display setup. First install xrandr:
 
-    VideoOutput {
-        fillMode: VideoOutput.PreserveAspectCrop
-        anchors.fill: parent
-        source: mediaplayer
-    }
+	sudo pacman -S xorg-xrandr
 
-Then select the Breeze Video theme from system settings and select the video you prefer as image background
+Now to explain the proper setup, an example will be given and based on this hopefully you'll
+manage to figure your proper values. The example setting is the following:
+
+
+                  Monitor #1         Monitor #2
+               ---------------    ---------------
+               |             |    |             |
+               |  1920x1080  |    |  2560x1440  |
+               |             |    |             |
+               ---------------    ---------------
+                    DP-2                DP-0
+
+Now the general idea is to set the Global Scale setting in KDE to adjust the desired setting in
+the monitor with the higher resolution/DPI and use xrandr to scale the smaller resolution screen.
+
+First check the output of:
+
+	xrandr -q
+
+It should display the connected monitors under the according port names and their supported configurations.
+In our example DP-2 and DP-0 are the DisplayPort interfaces that these monitors are pluged into. Now the
+important settings here are 'scale' and 'panning'. Scale should be set only on the smaller resolution monitor
+to balance the Global Scale setting value.
+
+Suppose that the Global Scale value is set to 120% and everything is displaying properly on Monitor #2. The goal
+is to present the content of the lower resolution screen as it would if it supported higher ones. In this example
+the FullHD Monitor #1 should present everything like it could support a 2560x1440 resolution.
+
+To find the proper scale setting you just do the following divisions:
+
+	2560 / 1920 and 1440 / 1080 that result in 1.3333 x 1.3333 scale factor
+
+Scaling with this value will result in a resolution:
+
+	1920 * 1.3333  x  1080 * 1.3333 = 2560 x 1440
+
+for Monitor #1. Monitor #2 will have the default scalling of 1x1 since there is no need to change anything there.
+
+Now to complete the monitor's configuration panning must be set. Panning is responsible for each monitor's
+orientation, accepts only positive integer values and starts from x:0,y:0 coordinates. It also takes into account
+the resulting resolution of each monitor in case scalling was applied. So it's important to start the panning
+setting definition from the top-left-most monitor from your psysical layout.
+
+In our example the lower resolution Monitor #1 is placed on the left of the higer resolution Monitor #2. Starting
+from there we have a panning for Monitor #1 of:
+
+	2560x1440+0+0
+
+which is 
+
+ - the resulted resolution after scaling is applied (1920x1080 * 1.3333x1.3333 = 2560x1440 in our example)
+ - plus x pixels for the width of every monitor that's left of the one being defined (0 in our example)
+ - plus y pixels for the height of every monitor that's above of the one being defined (0 in our example)
+
+The panning for Monitor #2 should be:
+
+	2560x1440+2560+0
+
+which is
+
+ - the resulted resolution after scaling is applied (2560x1440 * 1x1 = 2560x1440 in our example / No scaling is applied)
+ - plus x pixels for the width of every monitor that's left of the one being defined (2560 in our example / Monitor #1 panning resolution)
+ - plus y pixels for the height of every monitor that's above of the one being defined (0 in our example / No monitor above it)
+
+Finally the complete command of our example is:
+
+	xrandr --output DP-0 --mode 1920x1080 --rate 75.00 --scale 1.3333x1.3333 --panning 2560x1440+0+0 --output DP-2 --mode 2560x1440 --rate 60.00 --panning 2560x1440+2560+0 --right-of DP-0
+
+After the --output parameter every detailed aspect for each monitor is defined and the next --output is defined.
+
+Please note that apart from the panning setting, each monitor should also provide its orientation to the other monitors by using a setting from the following:
+
+	--left-of [Monitor Name] 
+	--right-of [Monitor Name] 
+	--above [Monitor Name] 
+	--below [Monitor Name] 
+
+IMPORTANT: Although this method sets the proper scaling in all monitors, the desktop of those being scaled is left with black stripes from the
+           right and bottom side. For some reason the xrandr must be called again to properly refresh the desktop section but without defining
+           any resolution, scale or panning change. Fortunately a workaround is to set the first time a different refresh rate from the desired one
+           in the monitor that has the issue. Then execute xrandr again after scaling and panning are configured to force a desktop size refresh.
+           
+           In the above example the refresh rate of Monitor #1 could be initlially set to 60Hz instead of 75Hz and after both monitors are configured
+           execute xrandr again to set the rate to 75Hz to fix this glitch:
+
+           		xrandr --output DP-0 --mode 1920x1080 --rate 60.00 --scale 1.3333x1.3333 --panning 2560x1440+0+0 --output DP-2 --mode 2560x1440 --rate 60.00 --panning 2560x1440+2560+0 --right-of DP-0 && xrandr --output DP-0 --mode 1920x1080 --rate 75.00
+
+Finally add the xrandr chain of commands that suits your configuration to:
+
+	System Settings -> Startup and Shutdown -> Autostart
+
+as a 'Program' entry encapsulating the xrandr command in sh:
+
+	sh -c 'xrandr --output DP-0 --mode 1920x1080 --rate 60.00 --scale 1.3333x1.3333 --panning 2560x1440+0+0 --output DP-2 --mode 2560x1440 --rate 60.00 --panning 2560x1440+2560+0 --right-of DP-0 && xrandr --output DP-0 --mode 1920x1080 --rate 75.00'
+
+In case that some plasma widgets such as Task Manager misbehave due to this display fix simply restart the IDE after executing xrandr with
+kquitapp5/kstart5 plasmashell:
+
+	sh -c 'xrandr --output DP-0 --mode 1920x1080 --rate 60.00 --scale 1.3333x1.3333 --panning 2560x1440+0+0 --output DP-2 --mode 2560x1440 --rate 60.00 --panning 2560x1440+2560+0 --right-of DP-0 && xrandr --output DP-0 --mode 1920x1080 --rate 75.00 && kquitapp5 plasmashell && kstart5 plasmashell'
